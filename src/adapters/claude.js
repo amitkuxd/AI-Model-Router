@@ -31,8 +31,9 @@ const SELECTORS = {
   // The opened menu container (aria-haspopup="menu" → role="menu").
   menu: '[role="menu"], [role="listbox"]',
 
-  // Individual selectable model rows inside the menu.
-  menuItem: '[role="menuitem"], [role="option"]',
+  // Individual selectable model rows inside the menu. Claude uses menuitemradio
+  // for model rows and menuitem for submenu triggers ("More models", "Effort").
+  menuItem: '[role="menuitem"], [role="menuitemradio"], [role="option"]',
 
   // Fallback mount if the send button's parent can't be resolved (see
   // getButtonMountPoint, which prefers placing Smart Send next to Send).
@@ -42,6 +43,60 @@ const SELECTORS = {
 /** Scoped query helpers. */
 const q = (sel, root = document) => (sel ? root.querySelector(sel) : null);
 const qa = (sel, root = document) => (sel ? Array.from(root.querySelectorAll(sel)) : []);
+
+/** Dispatch a keydown/keyup pair (Radix submenus open via keyboard). */
+function dispatchKey(el, key) {
+  if (!el) return;
+  const init = { bubbles: true, cancelable: true, key, code: key };
+  el.dispatchEvent(new KeyboardEvent('keydown', init));
+  el.dispatchEvent(new KeyboardEvent('keyup', init));
+}
+
+/** Close any open picker/submenu without changing the model. */
+function closeMenu(picker) {
+  dispatchKey(document.activeElement || document.body, 'Escape');
+  // A second Escape closes a still-open parent menu; harmless if already closed.
+  dispatchKey(document.body, 'Escape');
+}
+
+/**
+ * Open the "More models" submenu (a Radix SubTrigger with aria-haspopup="menu")
+ * and return the first item matching `findTarget`, or null. Tries the reliable
+ * techniques in order: keyboard (ArrowRight/Enter), click, then hover.
+ * @param {() => HTMLElement|undefined} findTarget
+ */
+async function openMoreModelsAndFind(findTarget) {
+  // Prefer the explicit "More models" trigger; fall back to any submenu trigger
+  // that isn't the Effort one (opening Effort would not reveal models).
+  const triggers = qa('[role="menuitem"], [role="menuitemradio"]');
+  const ordered = [
+    ...triggers.filter((el) => /more models/i.test(textOf(el))),
+    ...triggers.filter((el) =>
+      el.getAttribute('aria-haspopup') === 'menu' &&
+      !/more models|effort/i.test(textOf(el))),
+  ];
+
+  for (const trig of ordered) {
+    const opened = () => trig.getAttribute('aria-expanded') === 'true' || !!findTarget();
+
+    trig.focus?.();
+    dispatchKey(trig, 'ArrowRight');
+    if (await waitForCondition(opened, 700)) { if (findTarget()) return findTarget(); }
+
+    dispatchKey(trig, 'Enter');
+    if (await waitForCondition(() => !!findTarget(), 600)) return findTarget();
+
+    simulateClick(trig);
+    if (await waitForCondition(() => !!findTarget(), 700)) return findTarget();
+
+    // Hover as a last resort (some builds open on pointer intent).
+    for (const t of ['pointerover', 'pointerenter', 'pointermove']) {
+      trig.dispatchEvent(new PointerEvent(t, { bubbles: true, cancelable: true }));
+    }
+    if (await waitForCondition(() => !!findTarget(), 700)) return findTarget();
+  }
+  return null;
+}
 
 /** @type {import('./adapter.types.js').SiteAdapter} */
 export const claudeAdapter = {
@@ -91,21 +146,29 @@ export const claudeAdapter = {
 
     const before = textOf(picker);
 
-    // Open the menu.
+    // Open the picker menu.
     simulateClick(picker);
     const menu = await waitForElement(() => q(SELECTORS.menu), 3000);
     if (!menu) return false;
 
-    // Find the matching item.
-    const items = qa(SELECTORS.menuItem, menu);
-    const target = items.find((it) => {
+    // A matcher can accidentally hit a submenu trigger ("More models"), so only
+    // treat a real, selectable model row as the target.
+    const isModelRow = (it) => {
       const t = textOf(it);
+      if (/more models/i.test(t) || it.getAttribute('aria-haspopup') === 'menu') return false;
       return def.matchers.some((re) => re.test(t));
-    });
+    };
+    const findTarget = () => qa(SELECTORS.menuItem).find(isModelRow);
+
+    // Only Fable is shown at the top level on this account; Haiku/Sonnet/Opus
+    // live behind the "More models" submenu. Open it if the target isn't visible.
+    let target = findTarget();
+    if (!target) {
+      target = await openMoreModelsAndFind(findTarget);
+    }
 
     if (!target) {
-      // Close the menu so we don't leave UI open, then report failure.
-      simulateClick(picker);
+      closeMenu(picker);
       return false;
     }
 
@@ -114,9 +177,10 @@ export const claudeAdapter = {
     // Verify the picker label changed to reflect the new model.
     const changed = await waitForCondition(() => {
       const now = textOf(this.getModelPickerButton());
-      return now && (now !== before) && def.matchers.some((re) => re.test(now));
-    }, 2000);
+      return now && now !== before && def.matchers.some((re) => re.test(now));
+    }, 2500);
 
+    if (!changed) closeMenu(picker);
     return changed;
   },
 
