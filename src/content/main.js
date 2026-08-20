@@ -36,7 +36,10 @@ function isButtonPresent() {
 
 async function tryInject(adapter) {
   if (injecting || isButtonPresent()) return;
-  if (!settings?.siteEnabled?.[adapter.id]) return;
+  if (!settings?.siteEnabled?.[adapter.id]) {
+    console.warn('[AI Model Router] not enabled for', adapter.id, '— settings:', settings);
+    return;
+  }
   injecting = true;
   try {
     const mount = await waitForElement(() => adapter.getButtonMountPoint(), 8000);
@@ -50,8 +53,9 @@ async function tryInject(adapter) {
     if (isButtonPresent()) return;
     console.log('[AI Model Router] injecting Smart Send for', adapter.id, 'into', mount);
 
-    // Build the button first with placeholder handlers, then wire the router
-    // (router needs the button controller for state/shake).
+    // Build the button first, then wire the router. Handlers only fire on user
+    // interaction, by which point `router` is assigned.
+    let router = null;
     const controller = injectSmartSendButton(mount, {
       onSmartSend: () => router?.routeAndSend(),
       getModels: () =>
@@ -59,7 +63,7 @@ async function tryInject(adapter) {
       onManualSelect: (modelKey) => router?.routeAndSend({ forceModelKey: modelKey }),
     });
 
-    const router = createRouter({
+    router = createRouter({
       adapter,
       getSettings: () => settings,
       button: controller,
@@ -69,6 +73,10 @@ async function tryInject(adapter) {
 
     // Wire auto mode if enabled.
     applyAutoMode(adapter);
+    console.log('[AI Model Router] injected OK — button element:', controller.el,
+      'connected:', controller.el.isConnected);
+  } catch (err) {
+    console.error('[AI Model Router] inject error:', err);
   } finally {
     injecting = false;
   }
