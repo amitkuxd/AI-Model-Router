@@ -12,7 +12,17 @@ const KEY = 'settings';
  */
 export async function getSettings() {
   try {
-    const raw = await chrome.storage.sync.get(KEY);
+    // Guard against a storage call that never settles (seen in some content-
+    // script contexts): fall back to defaults after a short timeout so boot
+    // can never stall waiting on it.
+    const raw = await Promise.race([
+      Promise.resolve(chrome.storage?.sync?.get(KEY)),
+      new Promise((resolve) => setTimeout(() => resolve({ __timeout: true }), 1200)),
+    ]);
+    if (raw && raw.__timeout) {
+      console.warn('[AI Model Router] storage.get timed out; using defaults');
+      return defaultSettings();
+    }
     return mergeSettings(raw?.[KEY]);
   } catch (err) {
     console.error('[AI Model Router] getSettings failed, using defaults:', err);

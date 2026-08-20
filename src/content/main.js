@@ -36,6 +36,7 @@ function isButtonPresent() {
 
 async function tryInject(adapter) {
   if (injecting || isButtonPresent()) return;
+  console.log('[AI Model Router] tryInject start for', adapter.id);
   if (!settings?.siteEnabled?.[adapter.id]) {
     console.warn('[AI Model Router] not enabled for', adapter.id, '— settings:', settings);
     return;
@@ -184,6 +185,7 @@ async function boot() {
   if (!currentAdapter) return; // not one of our sites
 
   settings = await getSettings();
+  console.log('[AI Model Router] settings loaded; siteEnabled =', settings?.siteEnabled);
 
   // React to settings changes live (per-site toggle, auto mode, mappings).
   onSettingsChanged((next) => {
