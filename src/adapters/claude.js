@@ -16,32 +16,27 @@ import {
   waitForElement, waitForCondition, simulateClick, textOf,
 } from '../content/dom-utils.js';
 
-const PLACEHOLDER = '__amr_todo_fill_me__'; // valid selector, matches nothing
-
 const SELECTORS = {
-  // The prompt composer. Claude uses a contenteditable ProseMirror div.
-  // TODO('inspect'): likely 'div[contenteditable="true"]' inside the composer,
-  //   or a container with aria-label like "Write your prompt to Claude".
-  inputEl: PLACEHOLDER, // e.g. 'div.ProseMirror[contenteditable="true"]'
+  // The prompt composer — a contenteditable tiptap/ProseMirror div.
+  // Verified on claude.ai: role="textbox", contenteditable, stable data-testid.
+  inputEl: '[data-testid="chat-input"]',
 
-  // Native send button. TODO('inspect'): look for aria-label="Send message"
-  //   or a data-testid on the send/submit button.
-  sendButton: PLACEHOLDER, // e.g. 'button[aria-label="Send message"]'
+  // Native send button. Verified: aria-label="Send message".
+  sendButton: 'button[data-testid="chat-input-send"]',
 
-  // The model picker trigger (shows current model name).
-  // TODO('inspect'): a button in the composer toolbar showing "Sonnet"/"Opus".
-  modelPickerButton: PLACEHOLDER, // e.g. 'button[data-testid="model-selector"]'
+  // Model picker trigger (shows current model, e.g. "Fable 5 High").
+  // Verified: aria-haspopup="menu", stable data-testid.
+  modelPickerButton: 'button[data-testid="model-selector-dropdown"]',
 
-  // The opened menu container. TODO('inspect'): role="menu" or role="listbox".
+  // The opened menu container (aria-haspopup="menu" → role="menu").
   menu: '[role="menu"], [role="listbox"]',
 
   // Individual selectable model rows inside the menu.
-  // TODO('inspect'): role="menuitem" / role="option".
   menuItem: '[role="menuitem"], [role="option"]',
 
-  // Where Smart Send mounts — usually the send button's parent toolbar.
-  // TODO('inspect'): the flex container that holds the send button.
-  buttonMount: PLACEHOLDER, // e.g. 'div.composer-actions'
+  // Fallback mount if the send button's parent can't be resolved (see
+  // getButtonMountPoint, which prefers placing Smart Send next to Send).
+  buttonMount: '',
 };
 
 /** Scoped query helpers. */
@@ -134,6 +129,10 @@ export const claudeAdapter = {
   },
 
   getButtonMountPoint() {
+    // Prefer the send button's own container so Smart Send sits right beside it,
+    // which survives redesigns better than a hardcoded toolbar selector.
+    const send = this.getSendButton();
+    if (send?.parentElement) return send.parentElement;
     return q(SELECTORS.buttonMount);
   },
 };
