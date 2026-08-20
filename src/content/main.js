@@ -40,8 +40,15 @@ async function tryInject(adapter) {
   injecting = true;
   try {
     const mount = await waitForElement(() => adapter.getButtonMountPoint(), 8000);
-    if (!mount) return; // composer never appeared (or selectors unfilled) — no broken button
+    if (!mount) {
+      console.warn('[AI Model Router] mount point not found for', adapter.id,
+        '— input:', !!adapter.getInputEl(),
+        'picker:', !!adapter.getModelPickerButton(),
+        'send:', !!adapter.getSendButton());
+      return; // no broken button
+    }
     if (isButtonPresent()) return;
+    console.log('[AI Model Router] injecting Smart Send for', adapter.id, 'into', mount);
 
     // Build the button first with placeholder handlers, then wire the router
     // (router needs the button controller for state/shake).
@@ -165,6 +172,7 @@ let currentAdapter = null;
 
 async function boot() {
   currentAdapter = pickAdapter();
+  console.log('[AI Model Router] boot; site adapter =', currentAdapter?.id || 'none', 'url =', location.href);
   if (!currentAdapter) return; // not one of our sites
 
   settings = await getSettings();

@@ -6,6 +6,7 @@
 // Everything else in src/ is a real ES module. This is the one exception.
 (async () => {
   try {
+    console.log('[AI Model Router] content script loaded; importing main module…');
     const url = chrome.runtime.getURL('src/content/main.js');
     await import(url);
   } catch (err) {

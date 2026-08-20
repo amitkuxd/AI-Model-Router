@@ -129,10 +129,15 @@ export const claudeAdapter = {
   },
 
   getButtonMountPoint() {
-    // Prefer the send button's own container so Smart Send sits right beside it,
-    // which survives redesigns better than a hardcoded toolbar selector.
+    // Anchor to an ALWAYS-present control. Claude hides the send button until
+    // the user types, so the model picker (always visible) is a safer anchor;
+    // fall back to the send button, then the input's container.
+    const picker = this.getModelPickerButton();
+    if (picker?.parentElement) return picker.parentElement;
     const send = this.getSendButton();
     if (send?.parentElement) return send.parentElement;
+    const input = this.getInputEl();
+    if (input?.parentElement) return input.parentElement;
     return q(SELECTORS.buttonMount);
   },
 };
