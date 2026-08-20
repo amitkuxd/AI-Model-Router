@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "AI Model Router",
+  "version": "0.1.0",
+  "description": "Adds a Smart Send button that classifies your prompt and switches to the best model on claude.ai, chatgpt.com, and grok.com. No API keys, no network calls.",
+  "permissions": ["storage"],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "options_page": "src/options/options.html",
+  "action": {
+    "default_title": "AI Model Router",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://claude.ai/*",
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://grok.com/*"
+      ],
+      "js": ["src/bootstrap.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/*"],
+      "matches": [
+        "https://claude.ai/*",
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://grok.com/*"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "ai-model-router",
+  "version": "0.1.0",
+  "description": "Chrome extension: Smart Send button that classifies your prompt and switches to the best model on claude.ai, chatgpt.com, and grok.com.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node src/content/classifier.test.js"
+  },
+  "license": "MIT"
+}
