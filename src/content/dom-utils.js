@@ -14,11 +14,16 @@
 export function waitForElement(selectorFn, timeoutMs = 3000, root = document) {
   return new Promise((resolve) => {
     let done = false;
+    // Declare observer/timer BEFORE finish so the immediate-check path (which
+    // calls finish before they're assigned) doesn't hit a temporal-dead-zone
+    // error — that error was being swallowed and leaving the promise unresolved.
+    let observer = null;
+    let timer = null;
     const finish = (val) => {
       if (done) return;
       done = true;
-      clearTimeout(timer);
-      observer.disconnect();
+      if (timer) clearTimeout(timer);
+      if (observer) observer.disconnect();
       resolve(val);
     };
 
@@ -30,7 +35,7 @@ export function waitForElement(selectorFn, timeoutMs = 3000, root = document) {
       /* selectorFn must be forgiving; ignore and let the observer retry */
     }
 
-    const observer = new MutationObserver(() => {
+    observer = new MutationObserver(() => {
       try {
         const el = selectorFn();
         if (el) finish(el);
@@ -44,7 +49,7 @@ export function waitForElement(selectorFn, timeoutMs = 3000, root = document) {
       attributes: true,
     });
 
-    const timer = setTimeout(() => finish(null), timeoutMs);
+    timer = setTimeout(() => finish(null), timeoutMs);
   });
 }
 
