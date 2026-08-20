@@ -147,9 +147,10 @@ export const claudeAdapter = {
     const before = textOf(picker);
 
     // Open the picker menu.
+    console.log('[AI Model Router] selectModel: opening picker for', modelKey);
     simulateClick(picker);
     const menu = await waitForElement(() => q(SELECTORS.menu), 3000);
-    if (!menu) return false;
+    if (!menu) { console.warn('[AI Model Router] selectModel: menu never opened'); return false; }
 
     // A matcher can accidentally hit a submenu trigger ("More models"), so only
     // treat a real, selectable model row as the target.
@@ -163,15 +164,20 @@ export const claudeAdapter = {
     // Only Fable is shown at the top level on this account; Haiku/Sonnet/Opus
     // live behind the "More models" submenu. Open it if the target isn't visible.
     let target = findTarget();
+    console.log('[AI Model Router] selectModel: target at top level?', !!target);
     if (!target) {
       target = await openMoreModelsAndFind(findTarget);
+      console.log('[AI Model Router] selectModel: target after "More models"?', !!target);
     }
 
     if (!target) {
+      console.warn('[AI Model Router] selectModel: model row not found —', modelKey,
+        '| visible rows:', qa(SELECTORS.menuItem).map((el) => textOf(el).slice(0, 30)));
       closeMenu(picker);
       return false;
     }
 
+    console.log('[AI Model Router] selectModel: clicking', textOf(target).slice(0, 40));
     simulateClick(target);
 
     // Verify the picker label changed to reflect the new model.
@@ -180,6 +186,8 @@ export const claudeAdapter = {
       return now && now !== before && def.matchers.some((re) => re.test(now));
     }, 2500);
 
+    console.log('[AI Model Router] selectModel: switched?', changed,
+      '| picker now:', textOf(this.getModelPickerButton()).slice(0, 40));
     if (!changed) closeMenu(picker);
     return changed;
   },
